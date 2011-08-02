@@ -1,10 +1,9 @@
 <?php
 
-namespace DrSlump\SimpleParser\Atom;
+namespace DrSlump\Peg\Atom;
 
-use DrSlump\SimpleParser\Atom;
-use DrSlump\SimpleParser\Node;
-use DrSlump\SimpleParser\Source;
+use DrSlump\Peg\Atom;
+use DrSlump\Peg\Node;
 
 
 /**

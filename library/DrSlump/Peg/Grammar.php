@@ -1,10 +1,10 @@
 <?php
 
-namespace DrSlump\SimpleParser;
+namespace DrSlump\Peg;
 
-use DrSlump\SimpleParser;
-use DrSlump\SimpleParser\Atom;
-use DrSlump\SimpleParser\Source;
+use DrSlump\Peg;
+use DrSlump\Peg\Atom;
+use DrSlump\Peg\Source;
 
 abstract class Grammar extends Atom
     implements \ArrayAccess
@@ -12,20 +12,20 @@ abstract class Grammar extends Atom
     /** @var string The initial rule for the grammar */
     protected $root = 'root';
 
-    /** @var \DrSlump\SimpleParser\Atom[] */
+    /** @var \DrSlump\Peg\Atom[] */
     protected $rules = array();
 
 
     public function __construct()
     {
         // Register this grammar as the active one
-        SimpleParser::pushGrammar($this);
+        Peg::pushGrammar($this);
 
         // Configure rules for this grammar
         $this->rules();
 
         // Unregister this grammar
-        SimpleParser::popGrammar();
+        Peg::popGrammar();
     }
 
     // Implement this method to setup your grammar
@@ -53,7 +53,7 @@ abstract class Grammar extends Atom
         $node = $root->parse($source);
 
 
-        echo $node->inspect();
+        return $node;
     }
 
 
@@ -102,7 +102,7 @@ abstract class Grammar extends Atom
      */
     public function offsetSet($offset, $value)
     {
-        $value = SimpleParser::argument($value);
+        $value = Peg::argument($value);
         $this->rules[$offset] = $value;
     }
 

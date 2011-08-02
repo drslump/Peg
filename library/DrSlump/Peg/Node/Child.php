@@ -1,12 +1,12 @@
 <?php
 
-namespace DrSlump\SimpleParser\Node;
+namespace DrSlump\Peg\Node;
 
-use DrSlump\SimpleParser\Node;
+use DrSlump\Peg\Node;
 
 abstract class Child extends Node
 {
-    /** @var \DrSlump\SimpleParser\Node */
+    /** @var \DrSlump\Peg\Node */
     protected $parent = null;
 
     // The position where this node was found in the source

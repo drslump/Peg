@@ -1,19 +1,20 @@
 <?php
 
-namespace DrSlump\SimpleParser\Atom;
+namespace DrSlump\Peg\Atom;
 
-use DrSlump\SimpleParser\Node;
-use DrSlump\SimpleParser\Atom;
-use DrSlump\SimpleParser\Source;
+use DrSlump\Peg\Node;
+use DrSlump\Peg\Atom;
+use DrSlump\Peg\Source\SourceInterface;
+use DrSlump\Peg\Failure;
 
 
 class Alternates extends Atom
 {
-    /** @var \DrSlump\SimpleParser\Atom[] */
+    /** @var \DrSlump\Peg\Atom[] */
     protected $atoms = array();
 
     /**
-     * @param \DrSlump\SimpleParser\Atom[] $atoms
+     * @param \DrSlump\Peg\Atom[] $atoms
      */
     public function __construct(array $atoms = array())
     {
@@ -25,21 +26,21 @@ class Alternates extends Atom
         $this->atoms[] = $atom;
     }
 
-    protected function match(Source $source)
+    protected function match(SourceInterface $source)
     {
+        $ofs = $source->tell();
+
         foreach ($this->atoms as $atom) {
             $result = $atom->apply($source);
-            if (FALSE !== $result) {
+            if (!($result instanceof Failure)) {
                 echo "Alternate: OK!\n";
-                if ($this->description) {
-                    $result->setName($this->description);
-                }
                 return $result;
             }
+
+            $source->seek($ofs);
         }
 
         echo "Alternate: Fail\n";
-
-        return FALSE;
+        return new Failure('None of the alternatives match');
     }
 }

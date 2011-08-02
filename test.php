@@ -1,29 +1,33 @@
 <?php
 
-include_once 'library/DrSlump/SimpleParser.php';
+include_once 'library/DrSlump/Peg.php';
 
-include_once 'library/DrSlump/SimpleParser/Node.php';
-include_once 'library/DrSlump/SimpleParser/Node/Child.php';
-include_once 'library/DrSlump/SimpleParser/Node/NonTerminal.php';
-include_once 'library/DrSlump/SimpleParser/Node/Terminal.php';
-include_once 'library/DrSlump/SimpleParser/Node/Root.php';
+include_once 'library/DrSlump/Peg/Node.php';
+include_once 'library/DrSlump/Peg/Node/Child.php';
+include_once 'library/DrSlump/Peg/Node/NonTerminal.php';
+include_once 'library/DrSlump/Peg/Node/Terminal.php';
+include_once 'library/DrSlump/Peg/Node/Root.php';
 
-include_once 'library/DrSlump/SimpleParser/Atom.php';
-include_once 'library/DrSlump/SimpleParser/Atom/Ahead.php';
-include_once 'library/DrSlump/SimpleParser/Atom/Alternates.php';
-include_once 'library/DrSlump/SimpleParser/Atom/RegExp.php';
-include_once 'library/DrSlump/SimpleParser/Atom/Repeat.php';
-include_once 'library/DrSlump/SimpleParser/Atom/Sequence.php';
-include_once 'library/DrSlump/SimpleParser/Atom/Chained.php';
-include_once 'library/DrSlump/SimpleParser/Atom/String.php';
-include_once 'library/DrSlump/SimpleParser/Atom/Reference.php';
+include_once 'library/DrSlump/Peg/Atom.php';
+include_once 'library/DrSlump/Peg/Atom/Ahead.php';
+include_once 'library/DrSlump/Peg/Atom/Alternates.php';
+include_once 'library/DrSlump/Peg/Atom/RegExp.php';
+include_once 'library/DrSlump/Peg/Atom/Repeat.php';
+include_once 'library/DrSlump/Peg/Atom/Sequence.php';
+include_once 'library/DrSlump/Peg/Atom/Chained.php';
+include_once 'library/DrSlump/Peg/Atom/String.php';
+include_once 'library/DrSlump/Peg/Atom/Reference.php';
+include_once 'library/DrSlump/Peg/Atom/Named.php';
 
-include_once 'library/DrSlump/SimpleParser/Grammar.php';
-include_once 'library/DrSlump/SimpleParser/Source.php';
+include_once 'library/DrSlump/Peg/Failure.php';
 
-include_once 'library/DrSlump/SimpleParser/dsl.php';
+include_once 'library/DrSlump/Peg/Grammar.php';
+include_once 'library/DrSlump/Peg/Source/SourceInterface.php';
+include_once 'library/DrSlump/Peg/Source/Ascii.php';
 
-use DrSlump\SimpleParser\Grammar;
+include_once 'library/DrSlump/Peg/dsl.php';
+
+use DrSlump\Peg\Grammar;
 
 
 class MyGrammar extends Grammar
@@ -35,39 +39,49 @@ class MyGrammar extends Grammar
         //    ref('factor')->str('-')->ref('term'),
         //    ref('term')
         //);
-        //
-        //$this['term'] = alt(
-        //    seq( ref('factor'), '+', ref('term') ),
-        //    seq( ref('factor'), '-', ref('term') ),
-        //    seq( ref('factor') )
-        //);
 
-        $this['factor'] = rex('[0-9]');
-
-        $this['term'] = seq(
-            str('//'),
-            seq( rex('\n')->absent, any() )->repeat
+        $this['term'] = alt(
+            seq( ref('factor'), '+', ref('term') ),
+            seq( ref('factor'), '-', ref('term') ),
+            seq( ref('factor') )
         );
 
-        $this['term'] = str('//') -> rex('[^\n]')->repeat;
+        $this['factor'] = rex('[0-9]+');
 
-        $this['term'] = seq( '//', rex('[^\n]')->repeat ->as('comment') );
+        //$this['term'] = seq(
+        //    str('//'),
+        //    seq( rex('\n')->absent, any() )->repeat
+        //);
+
+        //$this['term'] = str('//') -> rex('[^\n]')->repeat;
+
+        //$this['term'] = seq( '//', rex('.*')->as('comment') );
 
 
         $this['root'] = $this['term'];
     }
 }
 
-$atom = new \DrSlump\SimpleParser\Atom\RegExp('foo');
 
 $grammar = new MyGrammar();
 
-var_dump($grammar);
+//var_dump($grammar);
 
-$grammar->parse("// fooOfoo");//1+2');
+//$n = $grammar->parse("// fooOfoo");//1+2');
+$n = $grammar->parse('1+2');
+
+var_dump($n);
+
+
+
+__halt_compiler();
+
+
+
 
 Root:
   - comment (fooOfoo)
+
 
 1 + 2 + 3
 
@@ -203,6 +217,48 @@ rule('comment',
 )->as('Line comment');
 
 
+
+number:
+    '-'?
+    ( '0' | /[1-9]/ digit* )          -> int
+    ( '.' | digit+ )?                 -> decimal
+    ( /[eE]/ ( '+' | '-' )? digit+ )? -> exponent
+
+comment:
+    '//' ( !'\n' . )* -> comment
+
+
+
+# Single character rules
+space: /\s+/
+lparen: '(' space?
+rparen: ')' space?
+comma: ',' space?
+
+# Things
+integer: /[0-9]+/ >int  space?
+identifier: /[a-z]+/ space?
+operator: '+' space?
+
+# Grammar parts
+sum:
+    integer      > left
+    operator     > op
+    expression   > right
+
+arglist: expression ( comma  expression )*
+
+funcall:
+    identifier>funcall
+    lparen arglist>arglist rparen
+
+expression: funcall | sum | integer
+
+root: expression
+
+
+
+
 $g = new Grammar();
 
 // Single character rules
@@ -267,7 +323,7 @@ $g['int'] = rex('[0-9]')->once->node('MyNode');
 
 
 
-use DrSlump\SimpleParser as P;
+use DrSlump\Peg as P;
 
 $g['sum'] = P::seq(
     P::ref('integer')->as('left'),

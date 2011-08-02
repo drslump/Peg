@@ -1,6 +1,6 @@
 <?php
 
-namespace DrSlump\SimpleParser\Node;
+namespace DrSlump\Peg\Node;
 
 class Root extends NonTerminal
 {

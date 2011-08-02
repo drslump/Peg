@@ -1,16 +1,16 @@
 <?php
 
-namespace DrSlump\SimpleParser\Atom;
+namespace DrSlump\Peg\Atom;
 
-use DrSlump\SimpleParser\Grammar;
-use DrSlump\SimpleParser\Atom;
-use DrSlump\SimpleParser\Node;
-use DrSlump\SimpleParser\Source;
+use DrSlump\Peg\Grammar;
+use DrSlump\Peg\Atom;
+use DrSlump\Peg\Node;
+use DrSlump\Peg\Source\SourceInterface;
 
 
 class Reference extends Atom
 {
-    /** @var \DrSlump\SimpleParser\Grammar */
+    /** @var \DrSlump\Peg\Grammar */
     protected $grammar;
     /** @var string */
     protected $reference;
@@ -21,10 +21,11 @@ class Reference extends Atom
         $this->reference = $reference;
     }
 
-    protected function match(Source $source)
+    protected function match(SourceInterface $source)
     {
         echo "REFERENCE: $this->reference\n";
 
+        // Fetch the referenced rule and just proxy it
         $rule = $this->grammar[$this->reference];
         return $rule->apply($source);
     }

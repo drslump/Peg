@@ -2,10 +2,10 @@
 
 namespace DrSlump;
 
-use \DrSlump\SimpleParser\Atom;
+use \DrSlump\Peg\Atom;
 
 
-class SimpleParser
+class Peg
 {
     static $grammars = array();
 
@@ -70,7 +70,7 @@ class SimpleParser
 
     static public function alt()
     {
-        $args = SimpleParser::arguments(func_get_args());
+        $args = self::arguments(func_get_args());
         return new Atom\Alternates($args);
     }
 
@@ -96,25 +96,28 @@ class SimpleParser
 
     static public function seq()
     {
-        $args = SimpleParser::arguments(func_get_args());
+        $args = self::arguments(func_get_args());
         return new Atom\Sequence($args);
     }
 
     static public function ref($name)
     {
         // This is very ugly but we need a way to pass around the active grammar
-        $grammar = SimpleParser::getActiveGrammar();
+        $grammar = self::getActiveGrammar();
         return new Atom\Reference($grammar, $name);
     }
 
     static public function any()
     {
-        return new Atom\Repeat(new Atom\RegExp('.'), 1);
+        return self::alt(
+            self::rex('.'),
+            self::str("\n")
+        );
     }
 
     static public function not($value)
     {
-        $value = SimpleParser::argument($value);
+        $value = self::argument($value);
         return new Atom\Ahead($value, false);
     }
 }

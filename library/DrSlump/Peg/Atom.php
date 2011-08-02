@@ -1,9 +1,9 @@
 <?php
 
-namespace DrSlump\SimpleParser;
+namespace DrSlump\Peg;
 
-use \DrSlump\SimpleParser;
-use \DrSlump\SimpleParser\Source;
+use \DrSlump\Peg;
+use \DrSlump\Peg\Source;
 
 /**
  * Class representing a grammar atom.
@@ -30,67 +30,77 @@ use \DrSlump\SimpleParser\Source;
  */
 abstract class Atom
 {
+    /** @var bool */
+    public $ignored = false;
+
+    
     /** @var \Closure */
     protected $cb;
-
-    /** @var bool */
-    protected $ignored = false;
 
 
     /**
      * Parses the given input. This is the method to use when you want to
      * process a source.
      *
-     * @param string | \DrSlump\SimpleParser\Source $source
-     * @return void
+     * @param string | \DrSlump\Peg\Source\SourceInterface $source
+     * @return \DrSlump\Peg\Node
      */
     public function parse($source)
     {
         if (is_string($source)) {
-            $source = new Source($source);
+            $source = new Source\Ascii($source);
         }
 
         $result = $this->apply($source);
+        if ($result instanceof Failure) {
+            throw new \Exception('Parser failed: ' . $result->getValue());
+        }
 
-        if (!$source->eof()) {
+        // Force a read to trigger the EOF
+        if (!$source->eof() && FALSE !== $source->read(1)) {
             throw new \Exception('Parser terminated before end of file');
-        }
-    }
-
-    /**
-     * Calls the match() method of the atom taking care of errors
-     *
-     * @param \DrSlump\SimpleParser\Source $source
-     * @return mixed
-     */
-    public function apply($source)
-    {
-        $ofs = $source->pos();
-
-        $result = $this->match($source);
-        if (FALSE === $result) {
-            $source->pos($ofs);
-            return FALSE;
-        }
-
-        if (is_callable($this->cbChange)) {
-            $result = call_user_func($this->cbChange, $result);
-            if (FALSE === $result) {
-                $source->pos($ofs);
-                return FALSE;
-            }
         }
 
         return $result;
     }
 
     /**
-     * Checks if the atom matches the source.
+     * Calls the match() method of the atom. In case of an error, apply will
+     * leave the source in the state it was before the match attempt.
      *
-     * @param \DrSlump\SimpleParser\Source $source
+     * @param \DrSlump\Peg\Source\SourceInterface $source
+     * @return mixed
+     */
+    public function apply(Source\SourceInterface $source)
+    {
+        $ofs = $source->tell();
+
+        // Try the match
+        $result = $this->match($source);
+        if ($result instanceof Failure) {
+            $source->seek($ofs);
+            return $result;
+        }
+
+        // If we have custom logic for this match run it
+        if (is_callable($this->cb)) {
+            $result = call_user_func($this->cb, $result);
+            if ($result instanceof Failure) {
+                $source->tell($ofs);
+                return $result;
+            }
+        }
+
+        return $this->ignored ? NULL : $result;
+    }
+
+    /**
+     * Checks if the atom constraints matches the source.
+     *
+     * @param \DrSlump\Peg\Source\SourceInterface $source
      * @return false | string
      */
-    protected function match(Source $source)
+    protected function match(Source\SourceInterface $source)
     {
         throw new \BadMethodCallException('Atom object should implement the match() method');
     }
@@ -156,7 +166,7 @@ abstract class Atom
     public function has($value = NULL)
     {
         if (NULL !== $value) {
-            $value = SimpleParser::argument($value);
+            $value = Peg::argument($value);
             $atom = new Atom\Ahead($value, true);
             return $this->_sequence($atom);
         } else {
@@ -173,7 +183,7 @@ abstract class Atom
     public function not($value = NULL)
     {
         if (NULL !== $value) {
-            $value = SimpleParser::argument($value);
+            $value = Peg::argument($value);
             $atom = new Atom\Ahead($value, false);
             return $this->_sequence($atom);
         } else {
@@ -204,7 +214,7 @@ abstract class Atom
     public function str($value)
     {
         return $this->_sequence(
-            SimpleParser::str($value)
+            Peg::str($value)
         );
     }
 
@@ -215,7 +225,7 @@ abstract class Atom
     public function stri($value)
     {
         return $this->_sequence(
-            SimpleParser::stri($value)
+            Peg::stri($value)
         );
     }
 
@@ -226,7 +236,7 @@ abstract class Atom
     public function rex($value)
     {
         return $this->_sequence(
-            SimpleParser::rex($value)
+            Peg::rex($value)
         );
     }
 
@@ -237,7 +247,7 @@ abstract class Atom
     public function rexi($value)
     {
         return $this->_sequence(
-            SimpleParser::rexi($value)
+            Peg::rexi($value)
         );
     }
 
@@ -247,7 +257,7 @@ abstract class Atom
     public function any()
     {
         return $this->_sequence(
-            SimpleParser::any()
+            Peg::any()
         );
     }
 
@@ -258,7 +268,7 @@ abstract class Atom
     public function ref($name)
     {
         return $this->_sequence(
-            SimpleParser::ref($name)
+            Peg::ref($name)
         );
     }
 
@@ -269,7 +279,7 @@ abstract class Atom
     public function alt()
     {
         return $this->_sequence(
-            call_user_func_array('SimpleParser::alt', func_get_args())
+            call_user_func_array('Peg::alt', func_get_args())
         );
     }
 
@@ -280,7 +290,7 @@ abstract class Atom
     public function seq()
     {
         return $this->_sequence(
-            call_user_func_array('SimpleParser::seq', func_get_args())
+            call_user_func_array('Peg::seq', func_get_args())
         );
     }
 
@@ -327,7 +337,7 @@ abstract class Atom
 
         // Otherwise create rule references with the method name
         $atom = $this->ref($fn);
-        // If an argument is supplied use it to created a named atom
+        // If an argument is supplied use it to create a named atom
         if (count($args) && !empty($args[0])) {
             $atom = $atom->name($args[0]);
         }
