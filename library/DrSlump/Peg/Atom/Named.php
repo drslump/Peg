@@ -4,6 +4,7 @@ namespace DrSlump\Peg\Atom;
 
 use DrSlump\Peg\Atom;
 use DrSlump\Peg\Source\SourceInterface;
+use DrSlump\Peg\Packrat\PackratInterface;
 use DrSlump\Peg\Failure;
 use DrSlump\Peg\Node;
 
@@ -21,18 +22,31 @@ class Named extends Atom
         $this->name = $name;
     }
 
-    protected function match(SourceInterface $source)
+    protected function match(SourceInterface $source, PackratInterface $packrat)
     {
-        $result = $this->atom->apply($source);
+        $row = $source->row();
+        $col = $source->column();
 
-        // If successful create a node object
+        $result = $this->atom->apply($source, $packrat);
+
         if ($result instanceof Failure) {
             return $result;
         }
 
-        $node = new Node($this->name);
+        // If successful create a node object
+        $node = new Node($this->name, $row, $col);
         $node->setValue($result);
 
         return $node;
+    }
+
+    public function inspect($prefix = '')
+    {
+        return $prefix . $this;
+    }
+
+    public function __toString()
+    {
+        return $this->name . ':' . $this->atom;
     }
 }

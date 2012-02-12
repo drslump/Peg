@@ -5,6 +5,7 @@ namespace DrSlump\Peg\Atom;
 use DrSlump\Peg\Atom;
 use DrSlump\Peg\Node;
 use DrSlump\Peg\Source\SourceInterface;
+use DrSlump\Peg\Packrat\PackratInterface;
 use DrSlump\Peg\Failure;
 
 
@@ -32,13 +33,26 @@ class RegExp extends Atom
     }
 
 
-    protected function match(SourceInterface $source)
+    protected function match(SourceInterface $source, PackratInterface $packrat = NULL)
     {
         $match = $source->match($this->pattern, $this->caseInsensitive);
         if (FALSE === $match) {
-            return new Failure("$this->pattern did not match");
+            return $this->fail("$this did not match");
         }
 
         return $match;
+    }
+
+
+    public function inspect($prefix = '')
+    {
+        return $prefix . $this;
+    }
+
+    public function __toString()
+    {
+        $s = preg_replace('/[a-z]+$/i', '', $this->pattern);
+        if ($this->caseInsensitive) $s .= 'i';
+        return $s;
     }
 }

@@ -5,8 +5,9 @@ namespace DrSlump\Peg;
 use DrSlump\Peg;
 use DrSlump\Peg\Atom;
 use DrSlump\Peg\Source;
+use DrSlump\Peg\Packrat\PackratInterface;
 
-abstract class Grammar extends Atom
+class Grammar extends Atom
     implements \ArrayAccess
 {
     /** @var string The initial rule for the grammar */
@@ -16,20 +17,26 @@ abstract class Grammar extends Atom
     protected $rules = array();
 
 
-    public function __construct()
+    public function __construct($callback = NULL)
     {
         // Register this grammar as the active one
         Peg::pushGrammar($this);
 
         // Configure rules for this grammar
-        $this->rules();
+        if (NULL === $callback) {
+            $this->rules();
+        } else {
+            call_user_func($callback, $this);
+        }
 
         // Unregister this grammar
         Peg::popGrammar();
     }
 
-    // Implement this method to setup your grammar
-    abstract protected function rules();
+    // Override this method to setup your grammar
+    protected function rules()
+    {
+    }
 
 
     public function root($name)
@@ -37,7 +44,7 @@ abstract class Grammar extends Atom
         $this->root = $name;
     }
 
-    public function parse($source)
+    public function parse($source, PackratInterface $packrat = NULL)
     {
         $root = $this->root;
 
@@ -50,8 +57,7 @@ abstract class Grammar extends Atom
 
         // Delegate the actual parsing to the root rule
         $root = $this->rules[$root];
-        $node = $root->parse($source);
-
+        $node = $root->parse($source, $packrat);
 
         return $node;
     }
@@ -115,5 +121,40 @@ abstract class Grammar extends Atom
     public function offsetUnset($offset)
     {
         unset($this->rules[$offset]);
+    }
+
+
+    public function inspect($prefix = '')
+    {
+        $objects = new \SplObjectStorage();
+
+        $art = Peg::$charArt;
+
+        $s = $prefix . "Grammar with the following rules:\n";
+
+        $prefix = str_replace($art[0], $art[2], $prefix);
+        $prefix = str_replace($art[1], $art[3], $prefix);
+
+        $idx = 0;
+        foreach ($this->rules as $name=>$atom) {
+            if ($objects->contains($atom)) {
+                $atom = new Atom\Reference($this, $objects[$atom]);
+            }
+
+            if ($idx === count($this->rules)-1) {
+                $s .= $prefix . $art[1] . strtoupper($name) . ":\n";
+                $s .= $atom->inspect($prefix . $art[3] . $art[1]) . "\n";
+            } else {
+                $s .= $prefix . $art[0] . strtoupper($name) . ":\n";
+                $s .= $atom->inspect($prefix . $art[2] . $art[1]) . "\n";
+            }
+
+
+            $objects->attach($atom, $name);
+
+            $idx++;
+        }
+
+        return rtrim($s);
     }
 }

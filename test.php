@@ -1,36 +1,15 @@
 <?php
 
 include_once 'library/DrSlump/Peg.php';
-
-include_once 'library/DrSlump/Peg/Node.php';
-include_once 'library/DrSlump/Peg/Node/Child.php';
-include_once 'library/DrSlump/Peg/Node/NonTerminal.php';
-include_once 'library/DrSlump/Peg/Node/Terminal.php';
-include_once 'library/DrSlump/Peg/Node/Root.php';
-
-include_once 'library/DrSlump/Peg/Atom.php';
-include_once 'library/DrSlump/Peg/Atom/Ahead.php';
-include_once 'library/DrSlump/Peg/Atom/Alternates.php';
-include_once 'library/DrSlump/Peg/Atom/RegExp.php';
-include_once 'library/DrSlump/Peg/Atom/Repeat.php';
-include_once 'library/DrSlump/Peg/Atom/Sequence.php';
-include_once 'library/DrSlump/Peg/Atom/Chained.php';
-include_once 'library/DrSlump/Peg/Atom/String.php';
-include_once 'library/DrSlump/Peg/Atom/Reference.php';
-include_once 'library/DrSlump/Peg/Atom/Named.php';
-
-include_once 'library/DrSlump/Peg/Failure.php';
-
-include_once 'library/DrSlump/Peg/Grammar.php';
-include_once 'library/DrSlump/Peg/Source/SourceInterface.php';
-include_once 'library/DrSlump/Peg/Source/Ascii.php';
-
 include_once 'library/DrSlump/Peg/dsl.php';
 
-use DrSlump\Peg\Grammar;
+use DrSlump\Peg;
+
+// Setup autoloader
+Peg::autoload();
 
 
-class MyGrammar extends Grammar
+class MyGrammar extends Peg\Grammar
 {
     protected function rules()
     {
@@ -41,12 +20,23 @@ class MyGrammar extends Grammar
         //);
 
         $this['term'] = alt(
-            seq( ref('factor'), '+', ref('term') ),
-            seq( ref('factor'), '-', ref('term') ),
-            seq( ref('factor') )
+            seq( '<factor>', '<op>', '<term>' ),
+            //seq( '<term>', '<op>', '<factor>' ),
+            ref('factor')
         );
 
-        $this['factor'] = rex('[0-9]+');
+        $this['op'] = seq(
+            alt('+', '-')->as('operator'),
+            rex('\s+')->maybe
+        );
+
+        $this['factor'] = seq(
+            rex('[0-9]+')->as('digit'),
+            rex('\s+')->maybe
+        );
+
+        $this['root'] = rex('\s+')->repeat
+                      ->ref('term');
 
         //$this['term'] = seq(
         //    str('//'),
@@ -56,27 +46,26 @@ class MyGrammar extends Grammar
         //$this['term'] = str('//') -> rex('[^\n]')->repeat;
 
         //$this['term'] = seq( '//', rex('.*')->as('comment') );
-
-
-        $this['root'] = $this['term'];
     }
 }
 
 
 $grammar = new MyGrammar();
 
-//var_dump($grammar);
+echo $grammar . PHP_EOL;
+
+$packrat = new DrSlump\Peg\Packrat\Dummy();
+$packrat = new DrSlump\Peg\Packrat\Standard();
+$packrat = new DrSlump\Peg\Packrat\Fixed(1000);
 
 //$n = $grammar->parse("// fooOfoo");//1+2');
-$n = $grammar->parse('1+2');
+$n = $grammar->parse("\n\n    1-2", $packrat);
 
 var_dump($n);
 
 
 
 __halt_compiler();
-
-
 
 
 Root:

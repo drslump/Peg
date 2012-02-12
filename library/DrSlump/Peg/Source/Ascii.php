@@ -2,6 +2,9 @@
 
 namespace DrSlump\Peg\Source;
 
+use DrSlump\Peg\Failure;
+use DrSlump\Peg\Atom;
+
 class Ascii implements SourceInterface
 {
     /** @var bool */
@@ -10,7 +13,6 @@ class Ascii implements SourceInterface
     protected $fd;
     /** @var \SplStack */
     protected $eol;
-
 
     public function __construct($stringOrFd)
     {
@@ -31,7 +33,7 @@ class Ascii implements SourceInterface
 
     public function __destruct()
     {
-        if (is_resource($this->fd)) {
+        if ($this->closeOnDestroy && is_resource($this->fd)) {
             fclose($this->fd);
         }
     }
@@ -114,7 +116,7 @@ class Ascii implements SourceInterface
     public function seek($byteOffset)
     {
         // Clean up eol's above the new offset
-        while (!$this->eol->isEmpty() && $this->eol->top() >= $byteOffset) {
+        while (!$this->eol->isEmpty() && $this->eol->top() > $byteOffset) {
             $this->eol->pop();
         }
 
@@ -128,7 +130,10 @@ class Ascii implements SourceInterface
      */
     public function column()
     {
-        return $this->tell() - $this->eol->top();
+        $ofs = $this->tell() ?: 0;
+        return $this->eol->isEmpty()
+               ? $ofs
+               : $ofs - $this->eol->top();
     }
 
     /**
@@ -138,7 +143,7 @@ class Ascii implements SourceInterface
      */
     public function row()
     {
-        return $this->eol->count();
+        return $this->eol->count() ?: 0;
     }
 
     /**
@@ -146,19 +151,25 @@ class Ascii implements SourceInterface
      *
      * @param string $expected
      * @param bool $caseInsensitive
-     * @return string | false
+     * @return string | \DrSlump\Peg\Failure
      */
     public function compare($expected, $caseInsensitive = FALSE)
     {
         $value = $this->read(strlen($expected));
 
-        echo "Comparing >$value< with >$expected<\n";
-
-        if ($caseInsensitive) {
-            return 0 === stripos($value, $expected) ? $value : FALSE;
+        if (FALSE === $value || strlen($value) < strlen($expected)) {
+            return new Failure('Premature end of input');
         }
 
-        return $value === $expected ? $value : FALSE;
+        PEG_DEBUG and print("Comparing >$value< with >$expected<\n");
+
+        if ($caseInsensitive && 0 === stripos($value, $expected)) {
+            return $value;
+        } else if ($value === $expected) {
+            return $value;
+        }
+
+        return new Failure("Expected $expected, but got $value");
     }
 
     /**
@@ -173,20 +184,24 @@ class Ascii implements SourceInterface
         $ofs = $this->tell();
         $ln = $this->readLn();
 
+        if (FALSE === $ln) {
+            return FALSE;
+        }
+
         // Add modifiers
         if ($caseInsensitive) {
             $expr .= 'i';
         }
 
-        echo "Matching $expr against >$ln<\n";
+        PEG_DEBUG and print("Matching $expr against >$ln<\n");
 
         if (!preg_match($expr, $ln, $m)) {
-            $this->seek($ofs);
-            return false;
+            return FALSE;
         }
 
         // Adjust the source pointer
         $this->seek($ofs + strlen($m[0]));
         return $m[0];
     }
+
 }

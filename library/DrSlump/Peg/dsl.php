@@ -11,7 +11,7 @@ use DrSlump\Peg\Atom;
  * @return \DrSlump\Peg\Atom\Alternates
  */
 function alt() {
-    return call_user_func_array('\DrSlump\Peg::alt', func_get_args());
+    return call_user_func_array('\DrSlump\Peg::alt', $args = func_get_args());
 }
 
 /**
@@ -50,21 +50,21 @@ function seq() {
 }
 
 /**
- * @return \DrSlump\Peg\AAtom\Reference
+ * @return \DrSlump\Peg\Atom\Reference
  */
 function ref($name) {
     return P::ref($name);
 }
 
 /**
- * @return \DrSlump\Peg\AAtom\Regexp
+ * @return \DrSlump\Peg\Atom\Regexp
  */
 function any() {
     return P::any();
 }
 
 /**
- * @return \DrSlump\Peg\AAtom\Ahead
+ * @return \DrSlump\Peg\Atom\Ahead
  */
 function not($value) {
     return P::not($value);

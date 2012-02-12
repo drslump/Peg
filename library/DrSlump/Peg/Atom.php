@@ -4,6 +4,7 @@ namespace DrSlump\Peg;
 
 use \DrSlump\Peg;
 use \DrSlump\Peg\Source;
+use \DrSlump\Peg\Packrat;
 
 /**
  * Class representing a grammar atom.
@@ -14,9 +15,11 @@ use \DrSlump\Peg\Source;
  * @property Atom\Repeat $rep        If present can be repeated
  * @property Atom\Repeat $many       If present can be repeated
  * @property Atom\Repeat $zeroOrMore If present can be repeated
+ *
  * @property Atom\Repeat $optional   Maybe present or not
  * @property Atom\Repeat $maybe      Maybe present or not
- * @property Atom\Repeat $zeroOrOne  At least once
+ * @property Atom\Repeat $zeroOrOne  Maybe present or not
+ *
  * @property Atom\Repeat $once       At least once
  * @property Atom\Repeat $many1      At least once
  * @property Atom\Repeat $oneOrMore  At least once
@@ -43,17 +46,22 @@ abstract class Atom
      * process a source.
      *
      * @param string | \DrSlump\Peg\Source\SourceInterface $source
+     * @param \DrSlump\Peg\Packrat\PackratInterface $packrat
      * @return \DrSlump\Peg\Node
      */
-    public function parse($source)
+    public function parse($source, Packrat\PackratInterface $packrat = NULL)
     {
         if (is_string($source)) {
             $source = new Source\Ascii($source);
         }
 
-        $result = $this->apply($source);
+        $result = $this->apply($source, $packrat);
+
+        // Clean the packrat to free up some memory
+        $packrat && $packrat->clear();
+
         if ($result instanceof Failure) {
-            throw new \Exception('Parser failed: ' . $result->getValue());
+            throw new \Exception('Parser failed: ' . PHP_EOL . $result);
         }
 
         // Force a read to trigger the EOF
@@ -69,42 +77,83 @@ abstract class Atom
      * leave the source in the state it was before the match attempt.
      *
      * @param \DrSlump\Peg\Source\SourceInterface $source
+     * @param \DrSlump\Peg\Packrat\PackratInterface $packrat
      * @return mixed
      */
-    public function apply(Source\SourceInterface $source)
+    public function apply(Source\SourceInterface $source, Packrat\PackratInterface $packrat = NULL)
     {
         $ofs = $source->tell();
 
+        // Packrat style memoization
+        if ($packrat && $packrat->has($this, $ofs)) {
+            $result = $packrat->get($this, $ofs, $length);
+            $source->seek($ofs + $length);
+            return $result;
+        }
+
         // Try the match
-        $result = $this->match($source);
+        $result = $this->match($source, $packrat);
         if ($result instanceof Failure) {
             $source->seek($ofs);
+            $result->setSource($source);
+
+            $packrat && $packrat->set($this, $ofs, $result);
+
             return $result;
         }
 
         // If we have custom logic for this match run it
         if (is_callable($this->cb)) {
-            $result = call_user_func($this->cb, $result);
-            if ($result instanceof Failure) {
-                $source->tell($ofs);
+            $failure = call_user_func($this->cb, $result);
+            if (FALSE === $failure || is_string($failure)) {
+                // Rewind
+                $source->seek($ofs);
+
+                if (!is_string($failure)) {
+                    $failure = "Rule callback didn't accept the input but it didn't gave a reason";
+                }
+
+                $result = $this->fail($failure);
+                $result->setSource($source);
+
+                $packrat && $packrat->set($this, $ofs, $result);
+
                 return $result;
             }
         }
 
-        return $this->ignored ? NULL : $result;
+        if ($this->ignored) {
+            $result = NULL;
+        }
+
+        $packrat && $packrat->set($this, $ofs, $result, $source->tell()-$ofs);
+
+        return $result;
     }
 
     /**
      * Checks if the atom constraints matches the source.
      *
      * @param \DrSlump\Peg\Source\SourceInterface $source
+     * @param \DrSlump\Peg\Packrat\PackratInterface $packrat
      * @return false | string
      */
-    protected function match(Source\SourceInterface $source)
+    protected function match(Source\SourceInterface $source, Packrat\PackratInterface $packrat)
     {
         throw new \BadMethodCallException('Atom object should implement the match() method');
     }
 
+
+    protected function fail($msg, $children = NULL)
+    {
+        $f = new Failure($msg);
+        $f->setAtom($this);
+        if (NULL !== $children) {
+           $f->setChildren(is_array($children) ? $children : array($children));
+        }
+
+        return $f;
+    }
 
 
     // Modifiers
@@ -118,6 +167,16 @@ abstract class Atom
     public function name($name)
     {
         return new Atom\Named($this, $name);
+    }
+
+    public function error($message)
+    {
+        return new Atom\Error($this, $message);
+    }
+
+    public function err($message)
+    {
+        return $this->error($message);
     }
 
     /**
@@ -279,7 +338,7 @@ abstract class Atom
     public function alt()
     {
         return $this->_sequence(
-            call_user_func_array('Peg::alt', func_get_args())
+            call_user_func_array('\DrSlump\Peg::alt', $args = func_get_args())
         );
     }
 
@@ -290,7 +349,7 @@ abstract class Atom
     public function seq()
     {
         return $this->_sequence(
-            call_user_func_array('Peg::seq', func_get_args())
+            call_user_func_array('\DrSlump\Peg::seq', $args = func_get_args())
         );
     }
 
@@ -344,4 +403,13 @@ abstract class Atom
 
         return $atom;
     }
+
+
+    abstract public function inspect($prefix = '');
+
+    public function __toString()
+    {
+        return $this->inspect();
+    }
+
 }

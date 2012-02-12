@@ -6,10 +6,14 @@ class Node
 {
     protected $name;
     protected $value;
+    protected $row;
+    protected $column;
 
-    public function __construct($name = NULL)
+    public function __construct($name, $row = NULL, $col = NULL)
     {
         $this->name = $name;
+        $this->row = $row;
+        $this->column = $col;
     }
 
     public function getName()
@@ -32,9 +36,14 @@ class Node
         $this->value = $value;
     }
 
-    //abstract public function isRoot();
-    //abstract public function isTerminal();
-    //abstract public function isEmpty();
-    //abstract public function inspect($indent = 0);
+    public function getRow()
+    {
+        return $this->row;
+    }
+
+    public function getColumn()
+    {
+        return $this->column;
+    }
 
 }
